@@ -97,15 +97,15 @@ typedef struct
 	double start_time;
 	int next_state, finish_time;
 	long long bytes_done, start_byte, size;
-	int bytes_per_second;
-	int delay_time;
+	size_t bytes_per_second;
+	size_t delay_time;
 	int outfd;
 	int ready;
 	message_t *message;
 	url_t *url;
 } axel_t;
 
-axel_t *axel_new( conf_t *conf, int count, void *url );
+axel_t *axel_new( conf_t *conf, size_t count, void *url );
 int axel_open( axel_t *axel );
 void axel_start( axel_t *axel );
 void axel_do( axel_t *axel );

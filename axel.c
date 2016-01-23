@@ -34,19 +34,18 @@ static void axel_divide( axel_t *axel );
 static char *buffer = NULL;
 
 /* Create a new axel_t structure					*/
-axel_t *axel_new( conf_t *conf, int count, void *url )
+axel_t *axel_new( conf_t *conf, size_t count, void *url )
 {
 	search_t *res;
 	axel_t *axel;
 	url_t *u;
 	char *s;
-	int i;
-	
-	axel = malloc( sizeof( axel_t ) );
-	memset( axel, 0, sizeof( axel_t ) );
+	size_t i;
+
+	axel = calloc(1, sizeof(axel_t));
 	*axel->conf = *conf;
-	axel->conn = malloc( sizeof( conn_t ) * axel->conf->num_connections );
-	memset( axel->conn, 0, sizeof( conn_t ) * axel->conf->num_connections );
+	axel->conn = calloc(axel->conf->num_connections, sizeof(conn_t));
+
 	if( axel->conf->max_speed > 0 )
 	{
 		if( (float) axel->conf->max_speed / axel->conf->buffer_size < 0.5 )
@@ -57,12 +56,15 @@ axel_t *axel_new( conf_t *conf, int count, void *url )
 		}
 		axel->delay_time = (int) ( (float) 1000000 / axel->conf->max_speed * axel->conf->buffer_size * axel->conf->num_connections );
 	}
+
 	if( buffer == NULL )
-		buffer = malloc( max( MAX_STRING, axel->conf->buffer_size ) );
-	
+		buffer = calloc(max(MAX_STRING, axel->conf->buffer_size), sizeof(char));
+
+  printf("Ola ok");
+
 	if( count == 0 )
 	{
-		axel->url = malloc( sizeof( url_t ) );
+		axel->url = malloc(sizeof( url_t ));
 		axel->url->next = axel->url;
 		strncpy( axel->url->text, (char *) url, MAX_STRING );
 	}
@@ -84,7 +86,7 @@ axel_t *axel_new( conf_t *conf, int count, void *url )
 			}
 		}
 	}
-	
+
 	axel->conn[0].conf = axel->conf;
 	if( !conn_set( &axel->conn[0], axel->url->text ) )
 	{
@@ -95,21 +97,21 @@ axel_t *axel_new( conf_t *conf, int count, void *url )
 
 	axel->conn[0].local_if = axel->conf->interfaces->text;
 	axel->conf->interfaces = axel->conf->interfaces->next;
-	
+
 	strncpy( axel->filename, axel->conn[0].file, MAX_STRING );
 	http_decode( axel->filename );
 	if( *axel->filename == 0 )	/* Index page == no fn		*/
 		strncpy( axel->filename, axel->conf->default_filename, MAX_STRING );
 	if( ( s = strchr( axel->filename, '?' ) ) != NULL && axel->conf->strip_cgi_parameters )
 		*s = 0;		/* Get rid of CGI parameters		*/
-	
+
 	if( !conn_init( &axel->conn[0] ) )
 	{
 		axel_message( axel, axel->conn[0].message );
 		axel->ready = -1;
 		return( axel );
 	}
-	
+
 	/* This does more than just checking the file size, it all depends
 	   on the protocol used.					*/
 	if( !conn_info( &axel->conn[0] ) )
@@ -125,26 +127,27 @@ axel_t *axel_new( conf_t *conf, int count, void *url )
 		if( axel->conf->verbose > 0 )
 			axel_message( axel, _("File size: %lld bytes"), axel->size );
 	}
-	
+
 	/* Wildcards in URL --> Get complete filename			*/
 	if( strchr( axel->filename, '*' ) || strchr( axel->filename, '?' ) )
 		strncpy( axel->filename, axel->conn[0].file, MAX_STRING );
-	
+
 	return( axel );
 }
 
 /* Open a local file to store the downloaded data			*/
 int axel_open( axel_t *axel )
 {
-	int i, fd;
+	size_t i;
+  int fd;
 	long long int j;
-	
+
 	if( axel->conf->verbose > 0 )
 		axel_message( axel, _("Opening output file %s"), axel->filename );
 	snprintf( buffer, MAX_STRING, "%s.st", axel->filename );
-	
+
 	axel->outfd = -1;
-	
+
 	/* Check whether server knows about RESTart and switch back to
 	   single connection download if necessary			*/
 	if( !axel->conn[0].supported )
@@ -158,21 +161,21 @@ int axel_open( axel_t *axel )
 	else if( ( fd = open( buffer, O_RDONLY ) ) != -1 )
 	{
 		read( fd, &axel->conf->num_connections, sizeof( axel->conf->num_connections ) );
-		
+
 		axel->conn = realloc( axel->conn, sizeof( conn_t ) * axel->conf->num_connections );
 		memset( axel->conn + 1, 0, sizeof( conn_t ) * ( axel->conf->num_connections - 1 ) );
 
 		axel_divide( axel );
-		
+
 		read( fd, &axel->bytes_done, sizeof( axel->bytes_done ) );
 		for( i = 0; i < axel->conf->num_connections; i ++ )
 			read( fd, &axel->conn[i].currentbyte, sizeof( axel->conn[i].currentbyte ) );
 
 		axel_message( axel, _("State file found: %lld bytes downloaded, %lld to go."),
 			axel->bytes_done, axel->size - axel->bytes_done );
-		
+
 		close( fd );
-		
+
 		if( ( axel->outfd = open( axel->filename, O_WRONLY, 0666 ) ) == -1 )
 		{
 			axel_message( axel, _("Error opening local file") );
@@ -184,13 +187,13 @@ int axel_open( axel_t *axel )
 	if( axel->outfd == -1 )
 	{
 		axel_divide( axel );
-		
+
 		if( ( axel->outfd = open( axel->filename, O_CREAT | O_WRONLY, 0666 ) ) == -1 )
 		{
 			axel_message( axel, _("Error opening local file") );
 			return( 0 );
 		}
-		
+
 		/* And check whether the filesystem can handle seeks to
 		   past-EOF areas.. Speeds things up. :) AFAIK this
 		   should just not happen:				*/
@@ -210,7 +213,7 @@ int axel_open( axel_t *axel )
 			}
 		}
 	}
-	
+
 	return( 1 );
 }
 
@@ -219,8 +222,8 @@ void axel_start( axel_t *axel )
 {
 	int i;
 	url_t* next_u = axel->url->next;
-	url_t* current_u = axel->url; 
-	
+	url_t* current_u = axel->url;
+
 	/* HTTP might've redirected and FTP handles wildcards, so
 	   re-scan the URL for every conn				*/
 	for( i = 0; i < axel->conf->num_connections; i ++ )
@@ -228,16 +231,16 @@ void axel_start( axel_t *axel )
 		conn_set( &axel->conn[i], current_u->text );
 		current_u = next_u;
 		next_u = next_u->next;
-		
+
 		axel->conn[i].local_if = axel->conf->interfaces->text;
 		axel->conf->interfaces = axel->conf->interfaces->next;
 		axel->conn[i].conf = axel->conf;
 		if( i ) axel->conn[i].supported = 1;
 	}
-	
+
 	if( axel->conf->verbose > 0 )
 		axel_message( axel, _("Starting download") );
-	
+
 	for( i = 0; i < axel->conf->num_connections; i ++ )
 	if( axel->conn[i].currentbyte <= axel->conn[i].lastbyte )
 	{
@@ -246,7 +249,7 @@ void axel_start( axel_t *axel )
 			axel_message( axel, _("Connection %i downloading from %s:%i using interface %s"),
 		        	      i, axel->conn[i].host, axel->conn[i].port, axel->conn[i].local_if );
 		}
-		
+
 		axel->conn[i].state = 1;
 		if( pthread_create( axel->conn[i].setup_thread, NULL, setup_thread, &axel->conn[i] ) != 0 )
 		{
@@ -258,7 +261,7 @@ void axel_start( axel_t *axel )
 			axel->conn[i].last_transfer = gettime();
 		}
 	}
-	
+
 	/* The real downloading will start now, so let's start counting	*/
 	axel->start_time = gettime();
 	axel->ready = 0;
@@ -271,14 +274,14 @@ void axel_do( axel_t *axel )
 	int hifd, i;
 	long long int remaining,size;
 	struct timeval timeval[1];
-	
+
 	/* Create statefile if necessary				*/
 	if( gettime() > axel->next_state )
 	{
 		save_state( axel );
 		axel->next_state = gettime() + axel->conf->save_state_interval;
 	}
-	
+
 	/* Wait for data on (one of) the connections			*/
 	FD_ZERO( fds );
 	hifd = 0;
@@ -306,7 +309,7 @@ void axel_do( axel_t *axel )
 			return;
 		}
 	}
-	
+
 	/* Handle connections which need attention			*/
 	for( i = 0; i < axel->conf->num_connections; i ++ )
 	if( axel->conn[i].enabled ) {
@@ -364,7 +367,7 @@ void axel_do( axel_t *axel )
 		lseek( axel->outfd, axel->conn[i].currentbyte, SEEK_SET );
 		if( write( axel->outfd, buffer, size ) != size )
 		{
-			
+
 			axel_message( axel, _("Write error!") );
 			axel->ready = -1;
 			return;
@@ -382,10 +385,10 @@ void axel_do( axel_t *axel )
 			axel->conn[i].enabled = 0;
 		}
 	} }
-	
+
 	if( axel->ready )
 		return;
-	
+
 conn_check:
 	/* Look for aborted connections and attempt to restart them.	*/
 	for( i = 0; i < axel->conf->num_connections; i ++ )
@@ -393,10 +396,10 @@ conn_check:
 		if( !axel->conn[i].enabled && axel->conn[i].currentbyte < axel->conn[i].lastbyte )
 		{
 			if( axel->conn[i].state == 0 )
-			{	
+			{
 				// Wait for termination of this thread
 				pthread_join(*(axel->conn[i].setup_thread), NULL);
-				
+
 				conn_set( &axel->conn[i], axel->url->text );
 				axel->url = axel->url->next;
 				/* axel->conn[i].local_if = axel->conf->interfaces->text;
@@ -404,7 +407,7 @@ conn_check:
 				if( axel->conf->verbose >= 2 )
 					axel_message( axel, _("Connection %i downloading from %s:%i using interface %s"),
 				        	      i, axel->conn[i].host, axel->conn[i].port, axel->conn[i].local_if );
-				
+
 				axel->conn[i].state = 1;
 				if( pthread_create( axel->conn[i].setup_thread, NULL, setup_thread, &axel->conn[i] ) == 0 )
 				{
@@ -443,7 +446,7 @@ conn_check:
 			axel->delay_time = 0;
 		usleep( axel->delay_time );
 	}
-	
+
 	/* Ready?							*/
 	if( axel->bytes_done == axel->size )
 		axel->ready = 1;
@@ -454,7 +457,7 @@ void axel_close( axel_t *axel )
 {
 	int i;
 	message_t *m;
-	
+
 	/* Terminate any thread still running				*/
 	for( i = 0; i < axel->conf->num_connections; i ++ )
 		/* don't try to kill non existing thread */
@@ -463,7 +466,7 @@ void axel_close( axel_t *axel )
 			pthread_cancel( *axel->conn[i].setup_thread );
 			pthread_detach( *axel->conn[i].setup_thread );
 		}
-	
+
 	/* Delete state file if necessary				*/
 	if( axel->ready == 1 )
 	{
@@ -483,7 +486,7 @@ void axel_close( axel_t *axel )
 		axel->message = axel->message->next;
 		free( m );
 	}
-	
+
 	/* Close all connections and local file				*/
 	close( axel->outfd );
 	for( i = 0; i < axel->conf->num_connections; i ++ )
@@ -497,7 +500,7 @@ void axel_close( axel_t *axel )
 double gettime()
 {
 	struct timeval time[1];
-	
+
 	gettimeofday( time, 0 );
 	return( (double) time->tv_sec + (double) time->tv_usec / 1000000 );
 }
@@ -512,7 +515,7 @@ void save_state( axel_t *axel )
 	   resuming anyway..						*/
 	if( !axel->conn[0].supported )
 		return;
-	
+
 	snprintf( fn, MAX_STRING, "%s.st", axel->filename );
 	if( ( fd = open( fn, O_CREAT | O_TRUNC | O_WRONLY, 0666 ) ) == -1 )
 	{
@@ -532,11 +535,11 @@ void *setup_thread( void *c )
 {
 	conn_t *conn = c;
 	int oldstate;
-	
+
 	/* Allow this thread to be killed at any time.			*/
 	pthread_setcancelstate( PTHREAD_CANCEL_ENABLE, &oldstate );
 	pthread_setcanceltype( PTHREAD_CANCEL_ASYNCHRONOUS, &oldstate );
-	
+
 	if( conn_setup( conn ) )
 	{
 		conn->last_transfer = gettime();
@@ -548,7 +551,7 @@ void *setup_thread( void *c )
 			return( NULL );
 		}
 	}
-	
+
 	conn_disconnect( conn );
 	conn->state = 0;
 	return( NULL );
@@ -557,14 +560,13 @@ void *setup_thread( void *c )
 /* Add a message to the axel->message structure				*/
 static void axel_message( axel_t *axel, char *format, ... )
 {
-	message_t *m = malloc( sizeof( message_t ) ), *n = axel->message;
+	message_t *m = calloc(sizeof(message_t), sizeof(message_t)), *n = axel->message;
 	va_list params;
-	
-	memset( m, 0, sizeof( message_t ) );
+
 	va_start( params, format );
 	vsnprintf( m->text, MAX_STRING, format, params );
 	va_end( params );
-	
+
 	if( axel->message == NULL )
 	{
 		axel->message = m;
@@ -581,7 +583,7 @@ static void axel_message( axel_t *axel, char *format, ... )
 static void axel_divide( axel_t *axel )
 {
 	int i;
-	
+
 	axel->conn[0].currentbyte = 0;
 	axel->conn[0].lastbyte = axel->size / axel->conf->num_connections - 1;
 	for( i = 1; i < axel->conf->num_connections; i ++ )
@@ -598,31 +600,29 @@ static void axel_divide( axel_t *axel )
 #endif
 }
 
-
-
 void free_axel_t ( axel_t *axel )
 {
 	url_t *current_u = axel->url;
 	url_t *n_u = axel->url->next;
-	
+
 	while (  current_u != axel->url ) {
 		free( current_u );
 		current_u = n_u;
 		n_u =  n_u->next;
 	}
 	free( axel->url );
-	
-	
+
+
 	if_t *current_if = axel->conf->interfaces;
 	if_t *n_if = axel->conf->interfaces->next;
-	
+
 	while (  current_if != axel->conf->interfaces ) {
 		free( current_if );
 		current_if = n_if;
 		n_if = n_if->next;
 	}
-	free( axel->conf->interfaces );	
-	
+	free( axel->conf->interfaces );
+
 	free( axel->conn );
 	free( axel );
 }

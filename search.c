@@ -34,44 +34,46 @@ int main( int argc, char *argv[] )
 {
 	conf_t conf[1];
 	search_t *res;
-	int i, j;
-	
+	int i;
+  size_t j;
+
 	if( argc != 2 )
 	{
 		fprintf( stderr, "Incorrect amount of arguments\n" );
 		return( 1 );
 	}
-	
+
 	conf_init( conf );
-	
-	res = malloc( sizeof( search_t ) * ( conf->search_amount + 1 ) );
-	memset( res, 0, sizeof( search_t ) * ( conf->search_amount + 1 ) );
+
+  res = calloc(conf->search_amount + 1, sizeof(search_t));
 	res->conf = conf;
-	
+
 	i = search_makelist( res, argv[1] );
+
 	if( i == -1 )
 	{
 		fprintf( stderr, "File not found\n" );
 		return( 1 );
 	}
+
 	printf( "%i usable mirrors:\n", search_getspeeds( res, i ) );
 	search_sortlist( res, i );
+
 	for( j = 0; j < i; j ++ )
 		printf( "%-70.70s %5i\n", res[j].url, res[j].speed );
-	
+
 	return( 0 );
 }
 #endif
 
 int search_makelist( search_t *results, char *url )
 {
-	int i, size = 8192, j = 0;
+  size_t size = 8192, j = 0;
+  ssize_t i;
 	char *s, *s1, *s2, *s3;
 	conn_t conn[1];
 	double t;
-	
-	memset( conn, 0, sizeof( conn_t ) );
-	
+
 	conn->conf = results->conf;
 	t = gettime();
 	if( !conn_set( conn, url ) )
@@ -80,22 +82,22 @@ int search_makelist( search_t *results, char *url )
 		return( -1 );
 	if( !conn_info( conn ) )
 		return( -1 );
-	
+
 	strcpy( results[0].url, url );
 	results[0].speed = 1 + 1000 * ( gettime() - t );
 	results[0].size = conn->size;
-	
+
 	s = malloc( size );
-	
+
 	sprintf( s, "http://www.filesearching.com/cgi-bin/s?q=%s&w=a&l=en&"
 		"t=f&e=on&m=%i&o=n&s1=%lld&s2=%lld&x=15&y=15",
 		conn->file, results->conf->search_amount,
 		conn->size, conn->size );
-	
+
 	conn_disconnect( conn );
 	memset( conn, 0, sizeof( conn_t ) );
 	conn->conf = results->conf;
-	
+
 	if( !conn_set( conn, s ) )
 	{
 		free( s );
@@ -111,7 +113,7 @@ int search_makelist( search_t *results, char *url )
 		free( s );
 		return( 1 );
 	}
-	
+
 	while( ( i = read( conn->fd, s + j, size - j ) ) > 0 )
 	{
 		j += i;
@@ -124,7 +126,7 @@ int search_makelist( search_t *results, char *url )
 	}
 
 	conn_disconnect( conn );
-	
+
 	s1 = strstr( s, "<pre class=list" );
 	s1 = strchr( s1, '\n' ) + 1;
 	if( strstr( s1, "</pre>" ) == NULL )
@@ -153,9 +155,9 @@ int search_makelist( search_t *results, char *url )
 		for( s1 = s3; *s1 != '\n'; s1 ++ );
 		s1 ++;
 	}
-	
+
 	free( s );
-	
+
 	return( i );
 }
 
@@ -165,8 +167,9 @@ int search_makelist( search_t *results, char *url )
 
 int search_getspeeds( search_t *results, int count )
 {
-	int i, running = 0, done = 0, correct = 0;
-	
+	int running = 0, done = 0, correct = 0;
+  size_t i;
+
 	for( i = 0; i < count; i ++ ) if( results[i].speed )
 	{
 		results[i].speed_start_time = 0;
@@ -174,7 +177,7 @@ int search_getspeeds( search_t *results, int count )
 		if( results[i].speed > 0 )
 			correct ++;
 	}
-	
+
 	while( done < count )
 	{
 		for( i = 0; i < count; i ++ )
@@ -233,11 +236,11 @@ void *search_speedtest( void *r )
 	search_t *results = r;
 	conn_t conn[1];
 	int oldstate;
-	
+
 	/* Allow this thread to be killed at any time.			*/
 	pthread_setcancelstate( PTHREAD_CANCEL_ENABLE, &oldstate );
 	pthread_setcanceltype( PTHREAD_CANCEL_ASYNCHRONOUS, &oldstate );
-	
+
 	memset( conn, 0, sizeof( conn_t ) );
 	conn->conf = results->conf;
 	if( !conn_set( conn, results->url ) )
@@ -253,21 +256,21 @@ void *search_speedtest( void *r )
 		results->speed = SPEED_ERROR;
 
 	conn_disconnect( conn );
-	
+
 	return( NULL );
 }
 
 char *axel_strrstr( char *haystack, char *needle )
 {
 	int i, j;
-	
+
 	for( i = strlen( haystack ) - strlen( needle ); i > 0; i -- )
 	{
 		for( j = 0; needle[j] && haystack[i+j] == needle[j]; j ++ );
 		if( !needle[j] )
 			return( haystack + i );
 	}
-	
+
 	return( NULL );
 }
 

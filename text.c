@@ -71,29 +71,29 @@ int main( int argc, char *argv[] )
 	axel_t *axel;
 	int i, j, cur_head = 0;
 	char *s;
-	
+
 #ifdef I18N
 	setlocale( LC_ALL, "" );
 	bindtextdomain( PACKAGE, LOCALE );
 	textdomain( PACKAGE );
 #endif
-	
+
 	if( !conf_init( conf ) )
 	{
 		return( 1 );
 	}
-	
+
 	opterr = 0;
-	
+
 	j = -1;
 	while( 1 )
 	{
 		int option;
-		
+
 		option = getopt_long( argc, argv, "s:n:o:S::NqvhVaH:U:", axel_options, NULL );
 		if( option == -1 )
 			break;
-		
+
 		switch( option )
 		{
 		case 'U':
@@ -163,7 +163,7 @@ int main( int argc, char *argv[] )
 	conf->add_header_count = cur_head;
 	if( j > -1 )
 		conf->verbose = j;
-	
+
 	if( argc - optind == 0 )
 	{
 		print_help();
@@ -186,12 +186,12 @@ int main( int argc, char *argv[] )
 			return( 1 );
 		}
 	}
-	
+
 	printf( _("Initializing download: %s\n"), s );
 	if( do_search )
 	{
-		search = malloc( sizeof( search_t ) * ( conf->search_amount + 1 ) );
-		memset( search, 0, sizeof( search_t ) * ( conf->search_amount + 1 ) );
+    search = calloc(conf->search_amount + 1, sizeof(search_t));
+
 		search[0].conf = conf;
 		if( conf->verbose )
 			printf( _("Doing search...\n") );
@@ -235,8 +235,7 @@ int main( int argc, char *argv[] )
 	}
 	else
 	{
-		search = malloc( sizeof( search_t ) * ( argc - optind ) );
-		memset( search, 0, sizeof( search_t ) * ( argc - optind ) );
+    search = calloc(argc - optind, sizeof(search_t));
 		for( i = 0; i < ( argc - optind ); i ++ )
 			strncpy( search[i].url, argv[optind+i], MAX_STRING );
 		axel = axel_new( conf, argc - optind, search );
@@ -253,23 +252,23 @@ int main( int argc, char *argv[] )
 	{
 		free( s );
 	}
-	
+
 	if( *fn )
 	{
 		struct stat buf;
-		
+
 		if( stat( fn, &buf ) == 0 )
 		{
 			if( S_ISDIR( buf.st_mode ) )
 			{
 				size_t fnlen = strlen(fn);
 				size_t axelfnlen = strlen(axel->filename);
-				
+
 				if (fnlen + 1 + axelfnlen + 1 > MAX_STRING) {
 					fprintf( stderr, _("Filename too long!\n"));
 					return ( 1 );
 				}
-				
+
 				fn[fnlen] = '/';
 				memcpy(fn+fnlen+1, axel->filename, axelfnlen);
 				fn[fnlen + 1 + axelfnlen] = '\0';
@@ -313,7 +312,7 @@ int main( int argc, char *argv[] )
 			i ++;
 		}
 	}
-	
+
 	if( !axel_open( axel ) )
 	{
 		print_messages( axel );
@@ -326,7 +325,7 @@ int main( int argc, char *argv[] )
 	if( conf->alternate_output )
 	{
 		putchar('\n');
-	} 
+	}
 	else
 	{
 		if( axel->bytes_done > 0 )	/* Print first dots if resuming	*/
@@ -336,20 +335,20 @@ int main( int argc, char *argv[] )
 		}
 	}
 	axel->start_byte = axel->bytes_done;
-	
+
 	/* Install save_state signal handler for resuming support	*/
 	signal( SIGINT, stop );
 	signal( SIGTERM, stop );
-	
+
 	while( !axel->ready && run )
 	{
 		long long int prev, done;
-		
+
 		prev = axel->bytes_done;
 		axel_do( axel );
-		
+
 		if( conf->alternate_output )
-		{			
+		{
 			if( !axel->message && prev != axel->bytes_done )
 				print_alternate_output( axel );
 		}
@@ -381,7 +380,7 @@ int main( int argc, char *argv[] )
 				fflush( stdout );
 			}
 		}
-		
+
 		if( axel->message )
 		{
 			if(conf->alternate_output==1)
@@ -410,19 +409,19 @@ int main( int argc, char *argv[] )
 			putchar( '\n' );
 		}
 	}
-	
+
 	strcpy( string + MAX_STRING / 2,
 		size_human( axel->bytes_done - axel->start_byte ) );
-	
+
 	printf( _("\nDownloaded %s in %s. (%.2f KB/s)\n"),
 		string + MAX_STRING / 2,
 		time_human( gettime() - axel->start_time ),
 		(double) axel->bytes_per_second / 1024 );
-	
+
 	i = axel->ready ? 0 : 2;
-	
+
 	axel_close( axel );
-	
+
 	return( i );
 }
 
@@ -443,7 +442,7 @@ char *size_human( long long int value )
 		sprintf( string, _("%.1f Megabyte"), (float) value / (1024 * 1024) );
 	else
 		sprintf( string, _("%.1f Gigabyte"), (float) value / (1024 * 1024 * 1024) );
-	
+
 	return( string );
 }
 
@@ -458,7 +457,7 @@ char *time_human( int value )
 		sprintf( string, _("%i:%02i seconds"), value / 60, value % 60 );
 	else
 		sprintf( string, _("%i:%02i:%02i seconds"), value / 3600, ( value / 60 ) % 60, value % 60 );
-	
+
 	return( string );
 }
 
@@ -467,7 +466,7 @@ char *time_human( int value )
 void print_commas( long long int bytes_done )
 {
 	int i, j;
-	
+
 	printf( "       " );
 	j = ( bytes_done / 1024 ) % 50;
 	if( j == 0 ) j = 50;
@@ -480,15 +479,15 @@ void print_commas( long long int bytes_done )
 	fflush( stdout );
 }
 
-static void print_alternate_output(axel_t *axel) 
+static void print_alternate_output(axel_t *axel)
 {
 	long long int done=axel->bytes_done;
 	long long int total=axel->size;
 	int i,j=0;
 	double now = gettime();
-	
+
 	printf("\r[%3ld%%] [", min(100,(long)(done*100./total+.5) ) );
-		
+
 	for(i=0;i<axel->conf->num_connections;i++)
 	{
 		for(;j<((double)axel->conn[i].currentbyte/(total+1)*50)-1;j++)
@@ -500,22 +499,22 @@ static void print_alternate_output(axel_t *axel)
 				putchar(i+'0');
 			else
 				putchar('#');
-		} else 
+		} else
 			putchar('.');
 
 		j++;
-		
+
 		for(;j<((double)axel->conn[i].lastbyte/(total+1)*50);j++)
 			putchar(' ');
 	}
-	
+
 	if(axel->bytes_per_second > 1048576)
 		printf( "] [%6.1fMB/s]", (double) axel->bytes_per_second / (1024*1024) );
 	else if(axel->bytes_per_second > 1024)
 		printf( "] [%6.1fKB/s]", (double) axel->bytes_per_second / 1024 );
 	else
 		printf( "] [%6.1fB/s]", (double) axel->bytes_per_second );
-	
+
 	if(done<total)
 	{
 		int seconds,minutes,hours,days;
@@ -530,7 +529,7 @@ static void print_alternate_output(axel_t *axel)
 		else
 			printf(" [%02d:%02d]",minutes,seconds);
 	}
-	
+
 	fflush( stdout );
 }
 
@@ -583,7 +582,7 @@ void print_version()
 void print_messages( axel_t *axel )
 {
 	message_t *m;
-	
+
 	while( axel->message )
 	{
 		printf( "%s\n", axel->message->text );
